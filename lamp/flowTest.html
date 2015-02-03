@@ -63,7 +63,7 @@ varying vec2 v_texCoord;
 varying vec4 vColor;
 uniform float u_mouseX;
 uniform float u_mouseY;
-vec2 scale = vec2(1.01,1.01);
+vec2 scale = vec2(u_mouseX, u_mouseY);
 void main() {
    gl_Position = vec4(pos.x*scale.x,pos.y*scale.y,pos.z,1.0);
    v_texCoord = texcoord;
@@ -106,7 +106,10 @@ void main() {
    // if(flash = 1.0){
     // gl_FragColor = 
    // }
-   gl_FragColor = fract(add);
+   // gl_FragColor = (add);
+     float mixAmt = 0.5 + 0.5*sin( time );
+
+   gl_FragColor = mix(add, fract(add), mixAmt);
    // gl_FragColor = mod(add,tex2.r);
   // gl_FragColor = add;
 }
@@ -141,14 +144,16 @@ precision mediump float;
       // float am1 = 1.0;
       // float am2 = 0.5 + 10.0*cos( time );
       float am2 = 2.0*cos( time );
+      float am3 = sin(time);
+      // float am4 = atan(time);
       // float am2 = 2.0;
 
       for( int i=0; i<20; i++ ){
         //still not sure about this loop - this is where the magic happens
         //takes the dot of three textures with three vectors, 2 texture's coordinates being added by either width or height of 1 pixel, 3rd parameter of texture2D is bias of texture (sharpening i think)
-        float h  = dot( texture2D(u_image, uv,               0.0).xyz, vec3(-0.25, 0.25, 0.25) );
-        float h1 = dot( texture2D(u_image, uv+vec2(e.x,0.0), 0.0).xyz, vec3(-0.25, 0.25, 0.25) );
-        float h2 = dot( texture2D(u_image, uv+vec2(0.0,e.y), 0.0).xyz, vec3(0.25, 0.25, 0.25) );
+        float h  = dot( texture2D(u_image, uv,               0.0).xyz, vec3(am3*0.25, am3*0.25, 0.25) );
+        float h1 = dot( texture2D(u_image, uv+vec2(e.x,0.0), 0.0).xyz, vec3(am3*0.25, am3*0.25, 0.25) );
+        float h2 = dot( texture2D(u_image, uv+vec2(0.0,e.y), 0.0).xyz, vec3(am3*0.25, am3*0.25, 0.25) );
             // gradient - whatever that means
         vec2 g = 0.01*vec2( (h1-h), (h2-h) )/e;
         // vec2 g = 0.001*vec2( (h2-h), (h1-h) )/(e);
@@ -310,8 +315,8 @@ function map(value,max,minrange,maxrange) {
 function onDocumentMouseMove(event) {
     mouseX = (event.clientX );
     mouseY = (event.clientY );
-    mapMouseX = map(mouseX, window.innerWidth, 1.09,0.99);
-    mapMouseY = map(mouseY, window.innerHeight, 1.09,0.99);
+    mapMouseX = map(mouseX, window.innerWidth, 1.03,0.97);
+    mapMouseY = map(mouseY, window.innerHeight, 1.03,0.97);
     mapMouseX2 = map(mouseX, window.innerWidth, 0.11,0.11);
     mapMouseY2 = map(mouseY, window.innerHeight, 0.11,0.11);
     //getNewImg();
