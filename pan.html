@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>opalescent.diamonds</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				color: #ffffff;
+				font-family:Monospace;
+				font-size:13px;
+				text-align:center;
+				font-weight: bold;
+
+				background-color: #000000;
+				margin: 0px;
+				overflow: hidden;
+			}
+
+		</style>
+	</head>
+	<body>
+
+		<div id="container"></div>
+		<script src="js/three.min.js"></script>
+	
+		<script src="js/Detector.js"></script>
+		<script src="js/stats.min.js"></script>
+		<script src="js/dat.gui.min.js"></script>
+		<script src="js/OrbitControls.js"></script>
+		<script id="vertexShader" type="x-shader/x-vertex">
+
+		varying vec2 vUv;
+
+			void main()
+			{
+				vUv = uv;
+				vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+				gl_Position = projectionMatrix * mvPosition;
+			}
+
+
+		</script>
+
+		<script id="fedbackFs" type="x-shader/x-fragment">
+		precision mediump float;
+		uniform sampler2D texture;
+		uniform vec2 resolution;
+		varying vec2 vUv;
+		const float stepSize = 1.0;
+
+		void main() {
+
+		  vec2 resolution2 = resolution * 0.55;
+
+		  vec2 offset = vec2(stepSize/resolution.x, stepSize/resolution.y);
+		  vec2 sharpenOffset = vec2(stepSize/resolution2.x, stepSize/resolution2.y);
+		  vec4 color = texture2D(texture, vUv);
+
+		  //blur
+		  color += texture2D(texture, vec2(vUv.x - offset.x, vUv.y)); //left
+		  color += texture2D(texture, vec2(vUv.x + offset.x, vUv.y)); //right
+		  color += texture2D(texture, vec2(vUv.x + offset.x, vUv.y + offset.y)); //bottom right
+		  color += texture2D(texture, vec2(vUv.x + offset.x, vUv.y - offset.y)); //top right
+		  color += texture2D(texture, vec2(vUv.x, vUv.y - offset.x)); //bottom
+		  color += texture2D(texture, vec2(vUv.x, vUv.y + offset.y)); //top
+		  color += texture2D(texture, vec2(vUv.x - offset.x, vUv.y + offset.y)); //bottom left
+		  color += texture2D(texture, vec2(vUv.x - offset.x, vUv.y - offset.y)); //top left
+
+		  color /= 8.0;
+
+		  //emboss or sharpen
+		  color += texture2D(texture, vec2(vUv.x, vUv.y - sharpenOffset.x)); //bottom
+		  color -= texture2D(texture, vec2(vUv.x, vUv.y + sharpenOffset.y*-2.5)); //top
+
+		  //reduce color if all white
+		  float avg = (color.r+color.g+color.b)/3.0;
+		  color = avg > 0.95 ? color-0.15 : color;
+
+		  gl_FragColor = color;
+		  // gl_FragColor = vec4(1.0,0.0,0.0,1.0) ;
+		}
+
+		</script>
+		<script id="feedbackFs" type="x-shader/x-fragment">
+		uniform vec2 resolution;
+		uniform float time;
+		uniform float pan;
+		uniform sampler2D texture;
+		varying vec2 vUv;
+
+		void main( void ){
+			vec2 p = gl_FragCoord.xy / resolution.xy;
+			
+			// vec2 uv = p*0.15 + 0.25;
+			vec2 uv = vUv*0.05+pan;
+			// vec2 uv = vUv;
+			
+			vec2 e = 1.0/resolution.xy;
+			
+			
+			float am1 = 0.5 + 0.5*sin( time );
+			// float am1 = 0.5 + 0.5*0.927180409;
+			float am2 = 0.5 + 0.5*cos( time );
+			// float am2 = 0.5 + 0.5*0.374615122;
+			
+			for( int i=0; i<5; i++ ){
+				float h  = dot( texture2D(texture, uv,               -100.0).xyz, vec3(0.333) );
+				float h1 = dot( texture2D(texture, uv+vec2(e.x,0.0), -100.0).xyz, vec3(0.333) );
+				float h2 = dot( texture2D(texture, uv+vec2(0.0,e.y), -100.0).xyz, vec3(0.333) );
+		        // gradient
+				vec2 g = 0.001*vec2( (h1-h), (h2-h) )/e;
+		        // isoline		
+				vec2 f = g.yx*vec2(-1.0,1.0);
+				
+				g = mix( g, f, am1 );
+				
+				uv -= 0.01*g*am2;
+			}
+			
+			vec3 col = texture2D(texture, uv).xyz;
+			
+		    // col *= 2.0;
+				
+			gl_FragColor = vec4(col, 1.0);
+		}
+		</script>
+		<script id="baseFs" type="x-shader/x-fragment">
+		precision mediump float;
+		uniform sampler2D texture;
+		varying vec2 vUv;
+
+		void main() {
+		  vec4 color = texture2D(texture, vUv);
+		  gl_FragColor = color;
+		}
+		</script>
+		<script src="js/feedback.js"></script>
+
+	</body>
+</html>
