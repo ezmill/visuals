@@ -3,6 +3,9 @@
   <title>lamp</title>
   <link href='http://fonts.googleapis.com/css?family=Old+Standard+TT' rel='stylesheet' type='text/css'>
   <style type="text/css">
+  body{
+    cursor: none;
+  }
   #intro {
     position:absolute;
     left:0;
@@ -63,7 +66,7 @@ varying vec2 v_texCoord;
 varying vec4 vColor;
 uniform float u_mouseX;
 uniform float u_mouseY;
-vec2 scale = vec2(1.01,1.01);
+vec2 scale = vec2(1.0,1.0);
 void main() {
    gl_Position = vec4(pos.x*scale.x,pos.y*scale.y,pos.z,1.0);
    v_texCoord = texcoord;
@@ -135,6 +138,7 @@ uniform sampler2D u_image;
 uniform sampler2D u_image2;
 uniform float time;
 uniform float flash;
+uniform float col;
 uniform sampler2D u_image3;
 varying vec2 v_texCoord;
 void main() {
@@ -146,7 +150,29 @@ void main() {
    // fc = avg <= 1.02  ? fc : 1.0-fc;
   vec4 add = (fc + tex0);
    // gl_FragColor = vec4((add).r,0,0,0);
-   gl_FragColor = vec4(0,0,(add).b,0);
+   // gl_FragColor = vec4(0,0,(add).b,0);
+  if(col == 0.0){
+    gl_FragColor = vec4((add).r,0,0,0);
+  } else if (col == 1.0){
+    gl_FragColor = vec4(0,0,(add).b,0);
+  } else if (col == 2.0){
+    gl_FragColor = vec4(0,(add).g,0,0);
+  } else if (col == 3.0){
+    gl_FragColor = vec4(fract(add).g,fract(add).g,fract(add).g,0);
+  } else if (col == 4.0){
+    gl_FragColor = vec4((add).r,0,(add).b,0);
+  } else if (col == 5.0){
+    // gl_FragColor = vec4((add).r,(add).r,(add).r,0);
+        gl_FragColor = vec4((add).r,(add).g,0,0);
+  } else if (col == 6.0){
+    gl_FragColor = vec4(0,(add).g,(add).b,0);
+
+  } else if (col == 7.0){
+    gl_FragColor = vec4((add).r,(add).r,(add).r,0);
+  } else {
+    gl_FragColor = fract(add);
+  }
+
    // if(flash = 1.0){
     // gl_FragColor = 
    // }
@@ -162,6 +188,8 @@ varying vec2 v_texCoord;
 uniform float time;
 uniform float freq;
 uniform float flash;
+uniform bool flashing;
+uniform float col;
 uniform sampler2D u_image;
 uniform sampler2D u_image2;
 uniform vec2 mouse;
@@ -169,15 +197,21 @@ void main(){
     
     vec2 tc = v_texCoord;
     vec4 look = texture2D(u_image2,tc);//sample repos texture
-    vec2 offs = vec2(look.y-look.x,look.w-look.z)*freq;
+    vec2 offs = vec2(look.y-look.x,look.w-look.z)*0.009;
     vec2 coord = offs+tc;  //relative coordinates
     
     vec4 repos = texture2D(u_image, coord);
-    if(mod(flash,0.2) == 0.0){
-      gl_FragColor = vec4(repos);    
-    } else {
-      gl_FragColor = vec4(1.0);
+    if(flashing == false){
+      gl_FragColor = vec4(repos); 
     }
+    if(flashing == true){
+      if(mod(time,0.5) == 0.0){
+        gl_FragColor = vec4(repos);    
+      } else {
+        gl_FragColor = vec4(1.0);
+      }
+    }
+
 } 
 </script>
 
@@ -186,45 +220,107 @@ var gl, cBB, canvas, prevFbo, diffFbo, feebackFbo, reposFbo;
 var baseProgram, diffProgram, reposProgram;
 var baseVs, translateVs, baseFs, diffFs, reposFs;
 var camTex;
-var videoLoaded = false;
+// var videoLoaded = false;
 var mouseX, mouseY;
 var mapMouseX = 1.01;
 var mapMouseY = 1.01;
 var mapMouseX2 = 0.11;
 var mapMouseY2 = 0.11;
 var interpMode = true;
+
+var videoLoaded = true;
+
+// for(var i = 1; i < 7; i++){
+//   var video=document.createElement('video');
+//   video.src = "clouds" + i +".mp4";
+//   video.loop = true;
+//   video.playbackRate = 2.0;
+//   video.play();
+//   videos.push(video);
+// }
 var video=document.createElement('video');
-video.src = "clouds2.mp4";
+video.src = "clouds.mp4";
 video.loop = true;
-video.playbackRate = 2.0;
-videoLoaded = true;
+// video.playbackRate = 2.0;
+video.play();
+var video2=document.createElement('video');
+video2.src = "clouds2.mp4";
+video2.loop = true;
+// video2.playbackRate = 2.0;
+video2.play();
+var video3=document.createElement('video');
+video3.src = "clouds4.mp4";
+video3.loop = true;
+// video3.playbackRate = 2.0;
+video3.play();
+var video4=document.createElement('video');
+video4.src = "clouds5.mp4";
+video4.loop = true;
+// video4.playbackRate = 2.0;
+video4.play();
+var video5=document.createElement('video');
+video5.src = "clouds6.mp4";
+video5.loop = true;
+// video5.playbackRate = 2.0;
+video5.play();
+var video6=document.createElement('video');
+video6.src = "clouds7.mp4";
+video6.loop = true;
+// video6.playbackRate = 2.0;
+video6.play();
+
+// video.src = "clouds4.mp4";
+// videoLoaded = true;
+var videos=[video,video2,video3,video4,video5,video6];
 canvas = document.getElementById("canvas");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 document.addEventListener('mousemove', onDocumentMouseMove, false);
 document.addEventListener('mousedown', onDocumentMouseDown, false);
+var time = 0.0;
+var globalParams = {
+  col: 0.0,
+  flashing: false,
+  time:time, 
+  video:0
+}
 var dancer = new Dancer();
 var audio = new Audio();
 audio.src = "skyfall.mp3";
-audio.currentTime = 150.0;
+audio.currentTime = 0.0;
 
 // for(var i = 0; i < times; i++){
-  dancer.between(58.666832, 60.889764, function(){
-    flashingLight();
-  }).onceAt(60.889764, function(){
-    endFlashingLight();
-  });
-  dancer.between(155.925902, 156.5, function(){
-    flashingLight();
-  }).onceAt(156.6, function(){
-    endFlashingLight();
-  }).load( audio );
-  dancer.play();
+  // dancer.between(58.666832, 60.889764, function(){
+  //   flashingLight();
+  // }).onceAt(60.889764, function(){
+  //   endFlashingLight();
+  // });
+  // dancer.between(155.925902, 156.5, function(){
+  //   flashingLight();
+  // }).onceAt(156.6, function(){
+  //   endFlashingLight();
+  // }).load( audio );
+  // dancer.play();
+
 
   
 // }
-video.play();
 init();
+setUniforms(globalParams);
+// dancer.between(58.666832, 59.666, function(){
+//     setUniforms({col: 1.0, flashing: true, time: time});
+// }).onceAt(59.666,function(){
+//     setUniforms({col: 2.0, flashing: false, time: time});
+//     setVideo(1);
+// })
+dancer.load( audio );
+dancer.play();
+// .between(155.925902, 156.5, function(){
+//   flashingLight();
+// }).onceAt(156.6, function(){
+//   endFlashingLight();
+// })
+
 function init(){
   initGl();
   initFbosAndShaders();
@@ -255,11 +351,10 @@ reposProgram = createProgram(gl, [baseVs, reposFs]);
 
 
 }
-var time = 0.0;
 function loop(){
 window.requestAnimationFrame(loop);
 if(videoLoaded){
- time += 0.00001;
+ time += 0.1;
  diffFbo.start();
  gl.useProgram(diffProgram);
  gl.uniform1f(gl.getUniformLocation(diffProgram, "u_mouseX"), mapMouseX);
@@ -271,7 +366,7 @@ if(videoLoaded){
  // var mapFreq = map(freq, 1,40, 0.009,10.0);
  // freq*=10000.0;
  // console.log(freq);
- gl.uniform1f(gl.getUniformLocation(reposProgram, "freq"), 0.009);
+ // gl.uniform1f(gl.getUniformLocation(reposProgram, "freq"), 0.009);
  feedbackFbo.draw3(diffProgram, camTex, prevFbo.texture);
  feedbackFbo.start();
  diffFbo.draw(reposProgram);
@@ -324,9 +419,19 @@ function onDocumentMouseMove(event) {
     mapMouseY2 = map(mouseY, window.innerHeight, 0.11,0.11);
     //getNewImg();
 }
-var counter = 0;
 function onDocumentMouseDown(event) {
-  // console.log(event);
+    globalParams.flashing = !globalParams.flashing;
+    if(!globalParams.flashing){
+          globalParams.video++;
+    }
+    globalParams.col+=0.5;
+    if(globalParams.video>videos.length){
+      globalParams.video = 0;
+    }
+    if(globalParams.col > 5){
+      globalParams.col = 0;
+    }
+  console.log(globalParams.col, globalParams.video);
   // if(event['target']['href'] === "http://www.google.com/chrome/" || event['target']['href'] === "https://www.mozilla.org/en-US/firefox/new/"  && counter === 0){
   //   OpenInNewTab(event.target.href);
   //   counter--;
@@ -335,28 +440,45 @@ function onDocumentMouseDown(event) {
   //   video.play();
   //   init();
   // } else if(counter>0){
-    console.log(dancer.getTime())
-    getNewImg();
+    // console.log(dancer.getTime())
+    // getNewImg();
+    setUniforms(globalParams);
+    setVideo(globalParams.video);
   // }
-  // counter++;
 }
 function OpenInNewTab(url) {
   var win = window.open(url, '_blank');
   win.focus();
 }
-var flash = 0.0;
-function flashingLight(){
-  window.requestAnimationFrame(flashingLight);
-  flash +=0.1;
-  gl.useProgram(reposProgram);
- gl.uniform1f(gl.getUniformLocation(reposProgram, "flash"), flash);
-}
+// var flash = 0.0;
+// function flashingLight(){
+//   window.requestAnimationFrame(flashingLight);
+//   flash +=0.1;
+//   gl.useProgram(reposProgram);
+//  gl.uniform1f(gl.getUniformLocation(reposProgram, "flash"), flash);
+// }
 
-function endFlashingLight(){
-  window.requestAnimationFrame(endFlashingLight);
-  flash = 0.2;
+// function endFlashingLight(){
+//   window.requestAnimationFrame(endFlashingLight);
+//   flash = 0.2;
+//   gl.useProgram(reposProgram);
+//   gl.uniform1f(gl.getUniformLocation(reposProgram, "flash"), flash);
+// }
+function setUniforms(params){
+  // console.log(params);
   gl.useProgram(reposProgram);
-  gl.uniform1f(gl.getUniformLocation(reposProgram, "flash"), flash);
+  gl.uniform1f(gl.getUniformLocation(reposProgram, "col"), params.col);
+  gl.uniform1i(gl.getUniformLocation(reposProgram, "flashing"), params.flashing);
+  gl.uniform1f(gl.getUniformLocation(reposProgram, "time"), params.time);
+  gl.useProgram(diffProgram);
+  gl.uniform1f(gl.getUniformLocation(diffProgram, "col"), params.col);
+  gl.uniform1i(gl.getUniformLocation(diffProgram, "flashing"), params.flashing);
+  gl.uniform1f(gl.getUniformLocation(diffProgram, "time"), params.time);
+}
+function setVideo(index){
+  camTex.image = videos[index];
+  gl.bindTexture(gl.TEXTURE_2D, camTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, camTex.image);
 }
   // window.addEventListener('DOMContentLoaded', function(){
   //       navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia || navigator.oGetUserMedia;
