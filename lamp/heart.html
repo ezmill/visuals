@@ -1,0 +1,512 @@
+<html>
+<head>
+  <title>lamp</title>
+  <link href='http://fonts.googleapis.com/css?family=Old+Standard+TT' rel='stylesheet' type='text/css'>
+  <style type="text/css">
+  body{
+    cursor: none;
+  }
+  #intro {
+    position:absolute;
+    left:0;
+    right:0;
+    margin-left:auto;
+    margin-right:auto;
+    z-index: 1;
+    color: #FFF;
+    font-family: "Old Standard TT";
+    width: 600px;
+    height: 100px;
+    /*text-align: center;*/
+  }
+  a{
+    /*text-decoration: */
+    color: white;
+  }
+  </style>
+</head>
+<body>
+<!--   <div id="intro">
+      <h1 style="color: white">Lamp by Ezra Miller</h1>
+
+    <p style="color: white">Make sure your browser supports WebGL before using </br>(<a href="http://www.google.com/chrome/">Chrome</a>, <a href="https://www.mozilla.org/en-US/firefox/new/">Firefox</a>) </p>
+
+    <p style="color: white">Click to start, click to switch interpolation modes</p>
+  </div> -->
+  <div id="container">
+    <canvas id="canvas" style ="background:black; position:absolute;top:0;left:0;z-index:0; width:100%; height:100%;">
+      Sorry but you're browser doesn't support the canvas :(
+    </canvas>
+  </div>
+  <script type="text/javascript" src="webgl-utils.js"></script>
+  <script type="text/javascript" src="fboTextureUtils.js"></script>
+  <script type="text/javascript" src="dancer.js"></script>
+  <script type="text/javascript" src="times.js"></script>
+  <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7/jquery.min.js"></script>
+
+
+<script id="baseVs" type="x-shader/x-vertex">
+attribute vec3 pos;
+attribute vec4 color;
+attribute vec2 texcoord;
+varying vec2 v_texCoord;
+varying vec4 vColor;
+void main() {
+   gl_Position = vec4((pos.x*1.0),pos.y,pos.z,1.0);
+   v_texCoord = texcoord;
+   vColor = color;
+}
+</script>
+
+<script id="translateVs" type="x-shader/x-vertex">
+attribute vec3 pos;
+attribute vec4 color;
+attribute vec2 texcoord;
+varying vec2 v_texCoord;
+varying vec4 vColor;
+uniform float u_mouseX;
+uniform float u_mouseY;
+vec2 scale = vec2(1.01,1.01);
+void main() {
+   gl_Position = vec4(pos.x*scale.x,pos.y*scale.y,pos.z,1.0);
+   v_texCoord = texcoord;
+   vColor = color;
+}
+</script>
+
+
+<script id="basFs" type="x-shader/x-fragment">
+precision mediump float;
+uniform sampler2D u_image;
+varying vec2 v_texCoord;
+void main() {
+  vec4 color = texture2D(u_image, v_texCoord);
+  gl_FragColor = vec4(color.r,color.g,color.b,1.0);
+}
+</script>
+<script id="baseFs" type="x-shader/x-fragment">
+precision mediump float;
+uniform sampler2D u_image;
+varying vec2 v_texCoord;
+vec3 rainbow(float h) {
+  h = mod(mod(h, 1.0) + 1.0, 1.0);
+  float h6 = h * 6.0;
+  float r = clamp(h6 - 4.0, 0.0, 1.0) +
+    clamp(2.0 - h6, 0.0, 1.0);
+  float g = h6 < 2.0
+    ? clamp(h6, 0.0, 1.0)
+    : clamp(4.0 - h6, 0.0, 1.0);
+  float b = h6 < 4.0
+    ? clamp(h6 - 2.0, 0.0, 1.0)
+    : clamp(6.0 - h6, 0.0, 1.0);
+  return vec3(r, g, b);
+}
+vec3 rgb2hsv(vec3 c)
+{
+    vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+    vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+    vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+    
+    float d = q.x - min(q.w, q.y);
+    float e = 1.0e-10;
+    return vec3(abs(( (q.z + (q.w - q.y) / (6.0 * d + e))) ), d / (q.x + e), q.x);
+}
+vec3 hsv2rgb(vec3 c)
+{
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+void main(){
+  vec4 tex0 = texture2D(u_image, v_texCoord);
+  vec3 hsv = rgb2hsv(tex0.rgb);
+  hsv.r += 10.01;
+  hsv.r = mod(hsv.r, 1.0);
+  hsv.g *= 1.001;
+  hsv.g = mod(hsv.g, 1.0);
+  vec3 rgb = hsv2rgb(hsv); 
+  // gl_FragColor = vec4(rgb,1.0);
+   gl_FragColor = vec4(rgb,1.0); 
+  // gl_FragColor = vec4(texture2D(u_image,v_texCoord).rgb,1.0); 
+}
+</script>
+
+
+<script id="diffFs" type="x-shader/x-fragment">
+precision mediump float;
+uniform sampler2D u_image;
+uniform sampler2D u_image2;
+uniform float time;
+uniform float flash;
+uniform float col;
+uniform sampler2D u_image3;
+varying vec2 v_texCoord;
+void main() {
+  vec4 tex0 = texture2D(u_image, v_texCoord);
+  vec4 tex1 = texture2D(u_image2, v_texCoord);
+  vec4 tex2 = texture2D(u_image3, v_texCoord);
+  vec4 fc = (tex2 - tex1);
+  float avg = dot(tex2.rgb - tex1.rgb, vec3(1.0))/3.0;
+   // fc = avg <= 1.02  ? fc : 1.0-fc;
+  vec4 add = (fc + tex0);
+   // gl_FragColor = vec4((add).r,0,0,0);
+   // gl_FragColor = vec4(0,0,(add).b,0);
+  if(col == 0.0){
+    gl_FragColor = vec4((add).r,0,(add).b,0);
+  } else if (col == 1.0){
+    gl_FragColor = vec4(0,0,(add).b,0);
+  } else if (col == 2.0){
+    gl_FragColor = vec4(0,(add).g,0,0);
+  } else if (col == 3.0){
+    gl_FragColor = vec4(fract(add).g,fract(add).g,fract(add).g,0);
+  } else if (col == 4.0){
+    gl_FragColor = vec4((add).r,0,(add).b,0);
+  } else if (col == 5.0){
+    // gl_FragColor = vec4((add).r,(add).r,(add).r,0);
+        gl_FragColor = vec4((add).r,(add).g,0,0);
+  } else if (col == 6.0){
+    gl_FragColor = vec4(0,(add).g,(add).b,0);
+
+  } else if (col == 7.0){
+    gl_FragColor = vec4((add).r,(add).r,(add).r,0);
+  } else {
+    gl_FragColor = fract(add);
+  }
+
+   // if(flash = 1.0){
+    // gl_FragColor = 
+   // }
+   // gl_FragColor = (add);
+   // gl_FragColor = mod(add,tex2.r);
+  // gl_FragColor = add;
+}
+</script>
+<script type="x-shader/x-fragment" id="reposFs">
+ 
+precision mediump float;
+varying vec2 v_texCoord;
+uniform float time;
+uniform float freq;
+uniform float flash;
+uniform bool flashing;
+uniform float col;
+uniform sampler2D u_image;
+uniform sampler2D u_image2;
+uniform vec2 mouse;
+void main(){
+    
+    vec2 tc = v_texCoord;
+    vec4 look = texture2D(u_image2,tc);//sample repos texture
+    vec2 offs = vec2(look.y-look.x,look.w-look.z)*0.00009;
+    vec2 coord = offs+tc;  //relative coordinates
+    
+    vec4 repos = texture2D(u_image, coord);
+    if(flashing == false){
+      gl_FragColor = vec4(repos); 
+    }
+    if(flashing == true){
+      if(mod(time,0.5) == 0.0){
+        gl_FragColor = vec4(repos);    
+      } else {
+        gl_FragColor = vec4(1.0);
+      }
+    }
+
+} 
+</script>
+
+<script type="text/javascript">
+var gl, cBB, canvas, prevFbo, diffFbo, feebackFbo, reposFbo;
+var baseProgram, diffProgram, reposProgram;
+var baseVs, translateVs, baseFs, diffFs, reposFs;
+var camTex;
+// var videoLoaded = false;
+var mouseX, mouseY;
+var mapMouseX = 1.01;
+var mapMouseY = 1.01;
+var mapMouseX2 = 0.11;
+var mapMouseY2 = 0.11;
+var interpMode = true;
+
+var videoLoaded = true;
+
+// for(var i = 1; i < 7; i++){
+//   var video=document.createElement('video');
+//   video.src = "clouds" + i +".mp4";
+//   video.loop = true;
+//   video.playbackRate = 2.0;
+//   video.play();
+//   videos.push(video);
+// }
+var video=document.createElement('video');
+video.src = "heart.mp4";
+video.loop = true;
+// video.playbackRate = 2.0;
+video.play();
+var video2=document.createElement('video');
+video2.src = "clouds2.mp4";
+video2.loop = true;
+// video2.playbackRate = 2.0;
+video2.play();
+var video3=document.createElement('video');
+video3.src = "clouds4.mp4";
+video3.loop = true;
+// video3.playbackRate = 2.0;
+video3.play();
+var video4=document.createElement('video');
+video4.src = "clouds5.mp4";
+video4.loop = true;
+// video4.playbackRate = 2.0;
+video4.play();
+var video5=document.createElement('video');
+video5.src = "clouds6.mp4";
+video5.loop = true;
+// video5.playbackRate = 2.0;
+video5.play();
+var video6=document.createElement('video');
+video6.src = "clouds7.mp4";
+video6.loop = true;
+// video6.playbackRate = 2.0;
+video6.play();
+
+// video.src = "clouds4.mp4";
+// videoLoaded = true;
+var videos=[video,video2,video3,video4,video5,video6];
+canvas = document.getElementById("canvas");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+document.addEventListener('mousemove', onDocumentMouseMove, false);
+document.addEventListener('mousedown', onDocumentMouseDown, false);
+var time = 0.0;
+var globalParams = {
+  col: 0.0,
+  flashing: false,
+  time:time, 
+  video:0
+}
+var dancer = new Dancer();
+var audio = new Audio();
+audio.src = "skyfall.mp3";
+audio.currentTime = 0.0;
+
+// for(var i = 0; i < times; i++){
+  // dancer.between(58.666832, 60.889764, function(){
+  //   flashingLight();
+  // }).onceAt(60.889764, function(){
+  //   endFlashingLight();
+  // });
+  // dancer.between(155.925902, 156.5, function(){
+  //   flashingLight();
+  // }).onceAt(156.6, function(){
+  //   endFlashingLight();
+  // }).load( audio );
+  // dancer.play();
+
+
+  
+// }
+init();
+setUniforms(globalParams);
+// dancer.between(58.666832, 59.666, function(){
+//     setUniforms({col: 1.0, flashing: true, time: time});
+// }).onceAt(59.666,function(){
+//     setUniforms({col: 2.0, flashing: false, time: time});
+//     setVideo(1);
+// })
+// dancer.load( audio );
+// dancer.play();
+// .between(155.925902, 156.5, function(){
+//   flashingLight();
+// }).onceAt(156.6, function(){
+//   endFlashingLight();
+// })
+
+function init(){
+  initGl();
+  initFbosAndShaders();
+  getCamAsTexture();
+  loop();  
+}
+function initGl(){
+gl = getWebGLContext(canvas);
+}
+function initFbosAndShaders(){
+cBB = new pxBB();
+prevFbo = new pxFbo();
+diffFbo = new pxFbo();
+feedbackFbo = new pxFbo();
+reposFbo = new pxFbo();
+prevFbo.allocate(window.innerWidth, window.innerHeight, true);
+diffFbo.allocate(window.innerWidth, window.innerHeight, true);
+feedbackFbo.allocate(window.innerWidth, window.innerHeight, true);
+reposFbo.allocate(window.innerWidth, window.innerHeight, true);
+baseVs = createShaderFromScriptElement(gl, "baseVs");
+translateVs = createShaderFromScriptElement(gl, "translateVs");
+baseFs = createShaderFromScriptElement(gl, "baseFs");
+diffFs = createShaderFromScriptElement(gl, "diffFs");
+reposFs = createShaderFromScriptElement(gl, "reposFs");
+baseProgram = createProgram(gl, [baseVs, baseFs]);
+diffProgram = createProgram(gl, [translateVs, diffFs]);
+reposProgram = createProgram(gl, [baseVs, reposFs]);
+
+
+}
+function loop(){
+window.requestAnimationFrame(loop);
+if(videoLoaded){
+ time += 0.1;
+ diffFbo.start();
+ gl.useProgram(diffProgram);
+ gl.uniform1f(gl.getUniformLocation(diffProgram, "u_mouseX"), mapMouseX);
+ gl.uniform1f(gl.getUniformLocation(diffProgram, "u_mouseY"), mapMouseY);
+ gl.useProgram(reposProgram);
+ gl.uniform2f(gl.getUniformLocation(reposProgram, "mouse"), mapMouseX2, mapMouseY2);
+ gl.uniform1f(gl.getUniformLocation(reposProgram, "time"), time);
+ // var freq = dancer.getFrequency(10);
+ // var mapFreq = map(freq, 1,40, 0.009,10.0);
+ // freq*=10000.0;
+ // console.log(freq);
+ // gl.uniform1f(gl.getUniformLocation(reposProgram, "freq"), 0.009);
+ feedbackFbo.draw3(diffProgram, camTex, prevFbo.texture);
+ feedbackFbo.start();
+ diffFbo.draw(reposProgram);
+ prevFbo.start();
+ cBB.draw(reposProgram, camTex);
+ 
+ reposFbo.start();
+ feedbackFbo.draw(baseProgram);
+   // gl.enable(gl.BLEND);
+    // gl.blendFunc(gl.ONE_MINUS_DST_COLOR,gl.DST_COLOR); 
+ gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+ feedbackFbo.draw(reposProgram);
+ gl.bindTexture(gl.TEXTURE_2D, camTex);
+ gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, camTex.image);
+}//end of videoLoaded 
+}
+function getCamAsTexture(){
+  camTex = createAndSetupTexture(gl);
+  camTex.image = video;
+  gl.bindTexture(gl.TEXTURE_2D, camTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, camTex.image);
+}
+function getNewImg(){
+   //feedback.start();
+   gl.disable(gl.BLEND);
+   interpMode = !interpMode;
+  prevFbo.allocate(window.innerWidth, window.innerHeight, interpMode);
+  diffFbo.allocate(window.innerWidth, window.innerHeight, interpMode);
+  feedbackFbo.allocate(window.innerWidth, window.innerHeight, interpMode);
+  reposFbo.allocate(window.innerWidth, window.innerHeight, interpMode);
+  if(!interpMode){
+   // diffFbo.start();
+   // diffFbo.draw2(baseProgram, prevFbo.texture);
+    feedbackFbo.start();
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE_MINUS_CONSTANT_COLOR,gl.CONSTANT_COLOR); 
+    reposFbo.draw(baseProgram);
+    // gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+}
+function map(value,max,minrange,maxrange) {
+    return ((max-value)/(max))*(maxrange-minrange)+minrange;
+}
+function onDocumentMouseMove(event) {
+    mouseX = (event.clientX );
+    mouseY = (event.clientY );
+    mapMouseX = map(mouseX, window.innerWidth, 1.09,0.99);
+    mapMouseY = map(mouseY, window.innerHeight, 1.09,0.99);
+    mapMouseX2 = map(mouseX, window.innerWidth, 0.11,0.11);
+    mapMouseY2 = map(mouseY, window.innerHeight, 0.11,0.11);
+    //getNewImg();
+}
+function onDocumentMouseDown(event) {
+    globalParams.flashing = !globalParams.flashing;
+    if(!globalParams.flashing){
+          globalParams.video++;
+    }
+    globalParams.col+=0.5;
+    if(globalParams.video>videos.length){
+      globalParams.video = 0;
+    }
+    if(globalParams.col > 5){
+      globalParams.col = 0;
+    }
+  console.log(globalParams.col, globalParams.video);
+  // if(event['target']['href'] === "http://www.google.com/chrome/" || event['target']['href'] === "https://www.mozilla.org/en-US/firefox/new/"  && counter === 0){
+  //   OpenInNewTab(event.target.href);
+  //   counter--;
+  // } else if(counter === 0){
+  //   document.getElementById("intro").style.display = "none";
+  //   video.play();
+  //   init();
+  // } else if(counter>0){
+    // console.log(dancer.getTime())
+    // getNewImg();
+    setUniforms(globalParams);
+    setVideo(globalParams.video);
+  // }
+}
+function OpenInNewTab(url) {
+  var win = window.open(url, '_blank');
+  win.focus();
+}
+// var flash = 0.0;
+// function flashingLight(){
+//   window.requestAnimationFrame(flashingLight);
+//   flash +=0.1;
+//   gl.useProgram(reposProgram);
+//  gl.uniform1f(gl.getUniformLocation(reposProgram, "flash"), flash);
+// }
+
+// function endFlashingLight(){
+//   window.requestAnimationFrame(endFlashingLight);
+//   flash = 0.2;
+//   gl.useProgram(reposProgram);
+//   gl.uniform1f(gl.getUniformLocation(reposProgram, "flash"), flash);
+// }
+function setUniforms(params){
+  // console.log(params);
+  gl.useProgram(reposProgram);
+  gl.uniform1f(gl.getUniformLocation(reposProgram, "col"), params.col);
+  gl.uniform1i(gl.getUniformLocation(reposProgram, "flashing"), params.flashing);
+  gl.uniform1f(gl.getUniformLocation(reposProgram, "time"), params.time);
+  gl.useProgram(diffProgram);
+  gl.uniform1f(gl.getUniformLocation(diffProgram, "col"), params.col);
+  gl.uniform1i(gl.getUniformLocation(diffProgram, "flashing"), params.flashing);
+  gl.uniform1f(gl.getUniformLocation(diffProgram, "time"), params.time);
+}
+function setVideo(index){
+  camTex.image = videos[index];
+  gl.bindTexture(gl.TEXTURE_2D, camTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, camTex.image);
+}
+  // window.addEventListener('DOMContentLoaded', function(){
+  //       navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia || navigator.oGetUserMedia;
+ 
+  //   if (navigator.getUserMedia) {       
+  //       navigator.getUserMedia({video: true, audio: false}, handleVideo, videoError);
+  //   }
+ 
+  //   function handleVideo(stream) {
+  //     var url = window.URL || window.webkitURL;
+  //      video.src = url ? url.createObjectURL(stream) : stream;
+  //       video.play();
+  //       //video.src = window.URL.createObjectURL(stream);
+  //       videoLoaded = true;
+  //   }
+ 
+  //   function videoError(e) {
+  //     alert("There seems to be something wrong with your webcam :(");
+  //   }
+  // });
+</script>
+
+
+
+
+
+</body>
+
+
+
+</html>
